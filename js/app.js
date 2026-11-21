@@ -1,4 +1,4 @@
-/* старт приложения: меню, темы, сплэш, Capacitor */
+/* старт приложения: компактное меню, темы, сплэш, Capacitor */
 NR.App = (() => {
   const { qs, esc } = NR.U;
   const I = NR.Icons.html;
@@ -18,31 +18,31 @@ NR.App = (() => {
   }
   function openDrawer() {
     const root = qs('#drawer-root');
-    root.classList.add('drawer-root'); /* ← вот этого не хватало, меню не выезжало */
+    root.classList.add('drawer-root');
     const route = NR.Router.parse();
     const items = [
-      { icon: 'books', label: 'Каталог', hash: '#/', cnt: NR.Data.all().length, on: route.path === '' && !route.query.author },
-      { icon: 'heart', label: 'Избранное', hash: '#/shelf/favorite', cnt: NR.Data.countShelf('favorite') },
-      { icon: 'plane', label: 'Прочитано', hash: '#/shelf/completed', cnt: NR.Data.countShelf('completed') },
-      { icon: 'reading', label: 'В процессе', hash: '#/shelf/reading', cnt: NR.Data.countShelf('reading') },
-      { icon: 'plan', label: 'В планах', hash: '#/shelf/planned', cnt: NR.Data.countShelf('planned') },
-      { icon: 'drop', label: 'Брошено', hash: '#/shelf/dropped', cnt: NR.Data.countShelf('dropped') },
-      { icon: 'collection', label: 'Коллекции', hash: '#/collections', cnt: NR.Store.s.collections.length },
-      { icon: 'author', label: 'Авторы', hash: '#/authors', cnt: NR.Data.authors().length },
+      { icon: 'books', label: 'Каталог', hash: '#/', on: route.path === '' && !route.query.author },
+      { icon: 'heart', label: 'Избранное', hash: '#/shelf/favorite' },
+      { icon: 'plane', label: 'Прочитано', hash: '#/shelf/completed' },
+      { icon: 'reading', label: 'В процессе', hash: '#/shelf/reading' },
+      { icon: 'plan', label: 'В планах', hash: '#/shelf/planned' },
+      { icon: 'drop', label: 'Брошено', hash: '#/shelf/dropped' },
+      { icon: 'collection', label: 'Коллекции', hash: '#/collections' },
+      { icon: 'author', label: 'Авторы', hash: '#/authors' },
       { icon: 'profile', label: 'Профиль', hash: '#/profile' },
-      { icon: 'upload', label: 'Загрузка', hash: '#/upload', cnt: NR.Data.uploadsList().length },
+      { icon: 'upload', label: 'Загрузка', hash: '#/upload' },
       { icon: 'coin', label: 'Все новеллы', hash: '#/', view: 'list' },
     ];
+    const night = NR.Store.s.theme === 'night';
     root.innerHTML = `
       <div class="drawer-scrim" data-x></div>
       <nav class="drawer">
-        <div class="dw-head">${NR.Icons.corner('tl')}${NR.Icons.corner('tr')}
-          <div class="dw-name">Ханами</div><div class="dw-sub">читалка новелл</div>
-        </div>
+        <div class="dw-head">${NR.Icons.corner('tl')}${NR.Icons.corner('tr')}</div>
         <div class="dw-list" id="dw-list"></div>
         <div class="dw-foot">
           <button class="dw-item" data-h="#/settings" style="--i:11">${I('settings', 's28')}<span>Настройки</span></button>
-          <button class="dw-item" data-about style="--i:12">${I('flower', 's28')}<span>О приложении</span></button>
+          <button class="dw-item" data-theme style="--i:12">${I(night ? 'sun' : 'moon', 's28')}<span>${night ? 'Розовая тема' : 'Ночная тема'}</span></button>
+          <span class="dw-corner-br">${NR.Icons.corner('')}</span>
         </div>
       </nav>`;
     drawerEl = root;
@@ -52,7 +52,7 @@ NR.App = (() => {
       const on = it.on || (route.path === it.hash.slice(2));
       b.className = 'dw-item' + (on ? ' on' : '');
       b.style.setProperty('--i', i);
-      b.innerHTML = I(it.icon, 's28') + `<span>${esc(it.label)}</span>` + (it.cnt != null ? `<span class="cnt">${it.cnt}</span>` : '');
+      b.innerHTML = I(it.icon, 's28') + `<span>${esc(it.label)}</span>`;
       b.onclick = () => {
         closeDrawer();
         if (it.view) { NR.Store.s.view = it.view; NR.Store.save(); }
@@ -61,7 +61,12 @@ NR.App = (() => {
       list.appendChild(b);
     });
     NR.U.qsa('[data-h]', root).forEach(b => b.onclick = () => { closeDrawer(); NR.Router.go(b.dataset.h); });
-    qs('[data-about]', root).onclick = () => { closeDrawer(); about(); };
+    qs('[data-theme]', root).onclick = function () {
+      const to = NR.Store.s.theme === 'night' ? 'rose' : 'night';
+      setTheme(to);
+      this.innerHTML = I(to === 'night' ? 'sun' : 'moon', 's28') + `<span>${to === 'night' ? 'Розовая тема' : 'Ночная тема'}</span>`;
+      NR.UI.toast(to === 'night' ? 'Ночная тема 🌙' : 'Розовая тема 🌸', { icon: to === 'night' ? 'moon' : 'sun' });
+    };
     qs('[data-x]', root).onclick = closeDrawer;
     document.body.style.overflow = 'hidden';
     requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('open')));
@@ -81,16 +86,6 @@ NR.App = (() => {
     };
     nav.addEventListener('pointerup', end);
     nav.addEventListener('pointercancel', () => { sx = null; nav.style.transform = ''; });
-  }
-  function about() {
-    NR.UI.modal({
-      title: 'О приложении', icon: 'flower', dark: true,
-      body: `<div class="about-orn">${NR.Icons.html('ornament')}</div>
-        <div class="about-name">Ханами</div>
-        <p class="about-sub">версия 1.1 · сделано с ♥<br>
-        Локальная читалка: книги, полки, заметки и цитаты живут только на твоём устройстве.<br><br>
-        Тексты подтягиваются из файлов txt / fb2 / epub — ни одной строчки книг в коде ✦</p>`
-    });
   }
 
   async function boot() {
@@ -136,5 +131,5 @@ NR.App = (() => {
     }
   }
   document.addEventListener('DOMContentLoaded', boot);
-  return { openDrawer, closeDrawer, drawerOpen, setTheme, about };
+  return { openDrawer, closeDrawer, drawerOpen, setTheme };
 })();
