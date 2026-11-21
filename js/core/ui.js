@@ -1,4 +1,4 @@
-/* тосты, модалки, выбор полки, редактор жанров */
+/* тосты, модалки, выбор полки, редактор жанров, розовые выпадающие списки */
 NR.UI = (() => {
   const { qs, esc, bus } = NR.U;
   const I = NR.Icons.html;
@@ -113,16 +113,53 @@ NR.UI = (() => {
     });
   }
 
-  /* редактор жанров: чипы + добавить свой */
+  /* все <select> открываются нашей розовой модалкой, а не системным списком */
+  function initThemedSelects() {
+    const openFor = sel => {
+      if (sel.disabled) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'md-list';
+      const label =
+        (sel.closest('.field') && sel.closest('.field').querySelector('label')) ||
+        (sel.closest('.set-row') && sel.closest('.set-row').querySelector('.lb'));
+      const md = modal({ title: label ? label.textContent.trim() : 'Выбери вариант', icon: 'chevD', body: wrap });
+      [...sel.options].forEach(o => {
+        const b = document.createElement('button');
+        b.className = 'md-opt' + (o.value === sel.value ? ' on' : '');
+        b.innerHTML = `<span>${esc(o.textContent)}</span><span class="tick">${I('save', 's16')}</span>`;
+        b.onclick = () => {
+          sel.value = o.value;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          md.close();
+        };
+        wrap.appendChild(b);
+      });
+    };
+    document.addEventListener('click', e => {
+      const sel = e.target.closest && e.target.closest('select');
+      if (!sel) return;
+      e.preventDefault(); e.stopPropagation();
+      openFor(sel);
+    }, true);
+    document.addEventListener('mousedown', e => {
+      if (e.target.closest && e.target.closest('select')) e.preventDefault();
+    }, true);
+    document.addEventListener('keydown', e => {
+      const sel = e.target.closest && e.target.closest('select');
+      if (sel && ['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); openFor(sel); }
+    }, true);
+  }
+
+  /* редактор жанров: чипы + подсказки вместо системного списка */
   function genreEditor(initial = []) {
     let list = [...initial];
     const el = document.createElement('div');
     const chips = document.createElement('div'); chips.className = 'genre-ed';
     const addRow = document.createElement('div'); addRow.className = 'genre-add';
-    const known = NR.Data.genres();
-    addRow.innerHTML = `<input class="inp" list="ge-dl" placeholder="Новый жанр…" maxlength="24">
-      <datalist id="ge-dl">${known.map(g => `<option value="${esc(g)}">`).join('')}</datalist>
+    addRow.innerHTML = `<input class="inp" placeholder="Новый жанр…" maxlength="24">
       <button class="btn small gold" type="button">${I('plus', 's16')}</button>`;
+    const sugg = document.createElement('div');
+    sugg.className = 'genre-ed'; sugg.style.marginTop = '8px';
     const inp = addRow.querySelector('input');
     const draw = () => {
       chips.innerHTML = list.length ? '' : '<span style="font-size:13px;color:var(--muted)">Пока пусто</span>';
@@ -132,6 +169,14 @@ NR.UI = (() => {
         c.querySelector('.x').onclick = () => { list = list.filter(x => x !== g); draw(); };
         chips.appendChild(c);
       });
+      sugg.innerHTML = '';
+      NR.Data.genres().filter(g => !list.includes(g)).slice(0, 12).forEach(g => {
+        const c = document.createElement('button');
+        c.type = 'button'; c.className = 'chip';
+        c.innerHTML = I('plus', 's16') + esc(g);
+        c.onclick = () => { list.push(g); draw(); };
+        sugg.appendChild(c);
+      });
     };
     const add = () => {
       const v = inp.value.trim();
@@ -140,7 +185,7 @@ NR.UI = (() => {
     };
     addRow.querySelector('button').onclick = add;
     inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
-    el.appendChild(chips); el.appendChild(addRow);
+    el.appendChild(chips); el.appendChild(addRow); el.appendChild(sugg);
     draw();
     return { el, get: () => [...list] };
   }
@@ -157,5 +202,5 @@ NR.UI = (() => {
       <h3>${esc(title)}</h3><p>${esc(sub)}</p>
     </div>`;
 
-  return { toast, modal, confirm, prompt, closeTopModal, shelfPicker, shelfInfo, SHELVES, genreEditor, emptyState };
+  return { toast, modal, confirm, prompt, closeTopModal, shelfPicker, shelfInfo, SHELVES, genreEditor, emptyState, initThemedSelects };
 })();
