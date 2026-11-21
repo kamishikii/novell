@@ -20,10 +20,10 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
-
-      - name: Install SDK 34
-        run: yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null
+      # Android SDK уже стоит на сервере GitHub, скачивать не нужно.
+      # Этот шаг просто на всякий случай и никогда не роняет сборку:
+      - name: SDK 34 (if missing)
+        run: yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1 || true
 
       - name: Install deps
         run: npm install
