@@ -31,6 +31,8 @@ NR.U = (() => {
     } catch (e) { return false; }
   }
   function pickFile(accept) {
+    /* для книг показываем ВСЕ файлы: андроид прячет .fb2/.epub при строгом фильтре */
+    if (accept && (accept.includes('.fb2') || accept.includes('.txt'))) accept = '*/*';
     return new Promise(res => {
       const inp = document.createElement('input');
       inp.type = 'file'; inp.accept = accept || ''; inp.style.display = 'none';
@@ -40,45 +42,19 @@ NR.U = (() => {
       inp.click();
     });
   }
-  /* умное чтение: UTF-8, иначе windows-1251 (частая кодировка русских txt) */
+  /* чтение книги: любой поддерживаемый формат → текст (главы запоминаются в NR.Books) */
   async function readFileSmart(file) {
-    const buf = await file.arrayBuffer();
-    let text;
-    try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
-    catch (e) { try { text = new TextDecoder('windows-1251').decode(buf); } catch (e2) { text = new TextDecoder().decode(buf); } }
-    text = text.replace(/^\uFEFF/, '');
-    if (/\.fb2$/i.test(file.name) || text.trimStart().startsWith('<?xml')) {
-      const conv = fb2ToText(text); if (conv) text = conv;
-    }
-    return text;
-  }
-  function fb2ToText(xml) {
-    try {
-      const doc = new DOMParser().parseFromString(xml, 'text/xml');
-      if (doc.querySelector('parsererror')) return null;
-      const out = [];
-      const walk = n => {
-        const tag = n.tagName;
-        if (tag === 'section' || tag === 'body' || tag === 'epigraph') [...n.children].forEach(walk);
-        else if (tag === 'title') { [...n.querySelectorAll('p')].forEach(p => out.push(p.textContent.trim())); out.push(''); }
-        else if (tag === 'p') out.push(n.textContent.trim());
-        else if (tag === 'poem') { [...n.querySelectorAll('v')].forEach(v => out.push(v.textContent.trim())); out.push(''); }
-        else if (tag === 'empty-line') out.push('');
-      };
-      [...doc.querySelectorAll('body')].filter(b => b.getAttribute('name') !== 'notes').forEach(walk);
-      const t = out.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
-      return t || null;
-    } catch (e) { return null; }
+    try { return await NR.Books.parse(file); }
+    catch (e) { throw new Error((e && e.message) || 'Не смогла прочитать файл'); }
   }
   function readImageDataURL(file, maxMB = 3) {
     return new Promise((res, rej) => {
       if (file.size > maxMB * 1048576) return rej(new Error('Картинка больше ' + maxMB + ' МБ'));
       const r = new FileReader();
-      r.onload = () => res(r.result); r.onerror = () => rej(new Error('Не读 файла'));
+      r.onload = () => res(r.result); r.onerror = () => rej(new Error('Не прочиталась картинка'));
       r.readAsDataURL(file);
     });
   }
-  /* простая шина событий */
   const subs = {};
   const bus = {
     on(ev, fn) { (subs[ev] = subs[ev] || []).push(fn); return () => { subs[ev] = subs[ev].filter(f => f !== fn); }; },
