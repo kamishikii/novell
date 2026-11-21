@@ -1,11 +1,13 @@
 /* каталог: data/novels.json + загруженные с телефона файлы (IndexedDB) */
 NR.Data = (() => {
   const { bus } = NR.U;
-  let base = [];            // из novels.json
-  let uploads = [];         // загруженные через приложение
-  let covers = {};          // id -> dataURL (свои обложки)
-  let textKeys = new Set(); // у каких id есть текст в IndexedDB
+  let base = [];
+  let uploads = [];
+  let covers = {};
+  let textKeys = new Set();
   const textCache = new Map();
+  const chaptersCache = new Map();
+  const textChapterMap = new Map();
   let db = null, dbBroken = false;
 
   function openDB() {
@@ -46,7 +48,7 @@ NR.Data = (() => {
     const b = raw(id); if (!b) return null;
     const o = NR.Store.override(id);
     return { ...b, ...o,
-      cover: covers[id] || o.cover || b.cover || null,
+      cover: covers[id] || (o.cover != null ? o.cover : b.cover) || null,
       shelf: NR.Store.shelf(id), progress: NR.Store.progress(id),
       uploaded: uploads.some(u => u.id === id), hasText: textKeys.has(id) || !!b.file };
   }
@@ -59,11 +61,15 @@ NR.Data = (() => {
   };
   const countShelf = key => all().filter(n => n.shelf === key).length;
 
+  function rememberChapters(id, text, chapters) {
+    if (chapters && chapters.length) { chaptersCache.set(id, chapters); textChapterMap.set(text, chapters); }
+    else { chaptersCache.delete(id); }
+  }
   async function getText(id) {
     if (textCache.has(id)) return textCache.get(id);
     if (textKeys.has(id)) {
       const rec = await idbGet('texts', id);
-      if (rec && rec.text) { textCache.set(id, rec.text); return rec.text; }
+      if (rec && rec.text) { textCache.set(id, rec.text); rememberChapters(id, rec.text, rec.chapters); return rec.text; }
     }
     const b = raw(id);
     if (b && b.file) {
@@ -76,12 +82,17 @@ NR.Data = (() => {
     }
     return null;
   }
-  async function attachText(id, text) {
-    await idbPut('texts', { id, text });
-    textKeys.add(id); textCache.set(id, text); bus.emit('data');
+  const chaptersForText = t => textChapterMap.get(t) || null;
+  async function attachText(id, text, chapters) {
+    if (chapters === undefined) chapters = NR.Books.takePending();
+    await idbPut('texts', { id, text, chapters: chapters || null });
+    textKeys.add(id); textCache.set(id, text); rememberChapters(id, text, chapters); bus.emit('data');
   }
   async function setCover(id, dataURL) {
     covers[id] = dataURL; await idbPut('covers', { id, data: dataURL }); bus.emit('data');
+  }
+  async function removeCover(id) {
+    delete covers[id]; await idbDel('covers', id); bus.emit('data');
   }
   async function addUpload(meta, text, coverData) {
     const id = 'u' + NR.U.uid();
@@ -97,28 +108,29 @@ NR.Data = (() => {
     const meta = uploads.find(u => u.id === id);
     const textRec = await idbGet('texts', id);
     const coverData = covers[id] || null;
+    if (textCache.has(id)) textChapterMap.delete(textCache.get(id));
     uploads = uploads.filter(u => u.id !== id);
-    textKeys.delete(id); textCache.delete(id); delete covers[id];
+    textKeys.delete(id); textCache.delete(id); chaptersCache.delete(id); delete covers[id];
     await idbDel('uploads', id); await idbDel('texts', id); await idbDel('covers', id);
     bus.emit('data');
-    return { meta, text: textRec ? textRec.text : null, cover: coverData };
+    return { meta, text: textRec ? textRec.text : null, chapters: textRec ? textRec.chapters : null, cover: coverData };
   }
   async function restoreUpload(snap) {
     if (!snap || !snap.meta) return;
     uploads.push(snap.meta);
     await idbPut('uploads', { id: snap.meta.id, meta: snap.meta });
-    if (snap.text != null) await attachText(snap.meta.id, snap.text);
+    if (snap.text != null) await attachText(snap.meta.id, snap.text, snap.chapters || null);
     if (snap.cover) await setCover(snap.meta.id, snap.cover);
     bus.emit('data');
   }
   async function clearIDB() {
     if (!db) return;
     for (const st of ['texts', 'uploads', 'covers']) await req(tx(st, 'readwrite').clear());
-    uploads = []; covers = {}; textKeys = new Set(); textCache.clear();
+    uploads = []; covers = {}; textKeys = new Set(); textCache.clear(); chaptersCache.clear(); textChapterMap.clear();
   }
   const isBroken = () => dbBroken;
   const uploadsList = () => uploads.map(u => get(u.id));
   const jsonNoText = () => base.filter(b => !textKeys.has(b.id)).map(b => get(b.id));
-  return { init, get, all, genres, authors, countShelf, getText, attachText, setCover,
+  return { init, get, all, genres, authors, countShelf, getText, chaptersForText, attachText, setCover, removeCover,
     addUpload, removeUpload, restoreUpload, clearIDB, isBroken, uploadsList, jsonNoText };
 })();
