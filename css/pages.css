@@ -79,3 +79,12 @@
 /* страховка для шторки меню */
 #drawer-root.open .drawer-scrim{opacity:1;}
 #drawer-root.open .drawer{transform:none;}
+/* обложка на странице новеллы: без этого span схлопывался в ноль */
+.cover{display:block;}
+/* аккуратные переносы, чтобы не было дыр между словами */
+.r-strip p{-webkit-hyphens:auto;hyphens:auto;overflow-wrap:break-word;}
+/* невидимый измеритель страниц */
+.r-measure{position:absolute!important;left:-99999px!important;top:0!important;visibility:hidden!important;
+  pointer-events:none!important;height:auto!important;width:auto;transform:none!important;margin:0!important;}
+/* подсветка найденного в тексте */
+mark.r-hit{background:rgba(217,167,46,.4);color:inherit;border-radius:3px;padding:0 1px;}
