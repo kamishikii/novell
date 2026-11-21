@@ -1,0 +1,17 @@
+{
+  "name": "hanami-reader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ханами — локальная читалка новелл",
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/app": "^6.0.1",
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/status-bar": "^6.0.1"
+  }
+}
