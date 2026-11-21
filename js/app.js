@@ -18,6 +18,7 @@ NR.App = (() => {
   }
   function openDrawer() {
     const root = qs('#drawer-root');
+    root.classList.add('drawer-root'); /* ← вот этого не хватало, меню не выезжало */
     const route = NR.Router.parse();
     const items = [
       { icon: 'books', label: 'Каталог', hash: '#/', cnt: NR.Data.all().length, on: route.path === '' && !route.query.author },
@@ -64,7 +65,6 @@ NR.App = (() => {
     qs('[data-x]', root).onclick = closeDrawer;
     document.body.style.overflow = 'hidden';
     requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('open')));
-    /* свайп влево закрывает */
     const nav = qs('.drawer', root);
     let sx = null;
     nav.addEventListener('pointerdown', e => { sx = e.clientX; });
@@ -87,9 +87,9 @@ NR.App = (() => {
       title: 'О приложении', icon: 'flower', dark: true,
       body: `<div class="about-orn">${NR.Icons.html('ornament')}</div>
         <div class="about-name">Ханами</div>
-        <p class="about-sub">версия 1.0 · сделано с ♥<br>
+        <p class="about-sub">версия 1.1 · сделано с ♥<br>
         Локальная читалка: книги, полки, заметки и цитаты живут только на твоём устройстве.<br><br>
-        Тексты подтягиваются из файлов .txt / .fb2 — ни одной строчки книг в коде ✦</p>`
+        Тексты подтягиваются из файлов txt / fb2 / epub — ни одной строчки книг в коде ✦</p>`
     });
   }
 
@@ -97,6 +97,7 @@ NR.App = (() => {
     document.documentElement.dataset.theme = NR.Store.s.theme;
     document.documentElement.dataset.anim = NR.Store.s.anim ? 'on' : 'off';
     NR.Icons.probe();
+    NR.UI.initThemedSelects();
     await NR.Data.init();
     NR.Router.register('catalog', NR.Pages.catalog);
     NR.Router.register('novel', NR.Pages.novel);
@@ -122,7 +123,6 @@ NR.App = (() => {
       e.preventDefault();
     });
 
-    /* Capacitor: прячем строку состояния, ловим системную «назад» */
     const cap = window.Capacitor;
     if (cap && cap.Plugins) {
       const SB = cap.Plugins.StatusBar, App = cap.Plugins.App;
