@@ -1,3 +1,4 @@
+
 /* читалка: страницы, свайпы, свиток, панель, настройки, поиск, оглавление, закладки, цитаты */
 NR.Pages.reader = (() => {
   const { qs, qsa, esc, clamp, debounce } = NR.U;
@@ -350,4 +351,154 @@ NR.Pages.reader = (() => {
     function hideSelTb() { if (selTb) { selTb.remove(); selTb = null; } }
     function addQuote(sel) {
       if (!sel || !sel.text) return;
-      NR.Store.addQuote(n.id, { text: sel.text, off: sel.off, ch: engine.chapterOf(se
+      NR.Store.addQuote(n.id, { text: sel.text, off: sel.off, ch: engine.chapterOf(sel.off), ts: Date.now() });
+      NR.UI.toast('Цитата сохранена ❝', { icon: 'quotes' });
+      updateUI();
+    }
+    const onSel = debounce(() => {
+      if (rr.destroyed) return;
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) { hideSelTb(); return; }
+      const range = sel.getRangeAt(0);
+      if (!strip.contains(range.commonAncestorContainer)) { hideSelTb(); return; }
+      const text = sel.toString().trim();
+      if (text.length < 3) { hideSelTb(); return; }
+      let node = range.startContainer, local = range.startOffset;
+      if (node.nodeType === 1) { node = node.childNodes[local] || node.firstChild; local = 0; }
+      const off = engine.offsetFromNode(node, local);
+      rr.lastSel = { text: text.slice(0, 1500), off };
+      const rect = range.getBoundingClientRect();
+      hideSelTb();
+      selTb = document.createElement('div');
+      selTb.className = 'sel-tb';
+      selTb.innerHTML = `<button data-q>${I('quotes')} Цитата</button><button data-c>${I('copy')} Копировать</button>`;
+      root.appendChild(selTb);
+      const w = selTb.offsetWidth;
+      selTb.style.left = clamp(rect.left + rect.width / 2 - w / 2, 8, window.innerWidth - w - 8) + 'px';
+      selTb.style.top = Math.max(8, rect.top - 52) + 'px';
+      selTb.addEventListener('pointerdown', e => e.stopPropagation());
+      selTb.querySelector('[data-q]').onclick = () => { addQuote(rr.lastSel); window.getSelection().removeAllRanges(); hideSelTb(); };
+      selTb.querySelector('[data-c]').onclick = async () => { await NR.U.copyText(text); NR.UI.toast('Скопировано ✓', { icon: 'copy' }); window.getSelection().removeAllRanges(); hideSelTb(); };
+    }, 180);
+    document.addEventListener('selectionchange', onSel);
+    rr.disposers.push(() => document.removeEventListener('selectionchange', onSel));
+
+    /* поиск */
+    function openSearch() {
+      closeSheet();
+      rr.searchOpen = true;
+      const d = document.createElement('div');
+      d.className = 'r-search';
+      d.innerHTML = `
+        <div class="hd-row">
+          <button class="icon-btn" data-x>${I('back')}</button>
+          <div class="search-pill">${I('search', 's20')}
+            <input type="search" placeholder="Найти в тексте…" autocomplete="off">
+            <button class="search-clear" data-c>${I('close', 's20')}</button>
+          </div>
+        </div>
+        <div class="rs-results" id="sr-res"><div class="rs-empty">${I('search')}<br>Введи слово — покажу все места в книге</div></div>`;
+      root.appendChild(d);
+      const inp = d.querySelector('input');
+      const res = qs('#sr-res', d);
+      const close = () => { rr.searchOpen = false; d.remove(); engine.setQuery(''); };
+      d.querySelector('[data-x]').onclick = close;
+      rr.closeSearch = close;
+      const clr = d.querySelector('[data-c]');
+      clr.onclick = () => { inp.value = ''; clr.classList.remove('show'); res.innerHTML = ''; inp.focus(); };
+      const run = debounce(() => {
+        const q = inp.value.trim();
+        clr.classList.toggle('show', !!q);
+        if (q.length < 2) { res.innerHTML = `<div class="rs-empty">${I('search')}<br>Минимум 2 буквы</div>`; return; }
+        const lower = engine.text.toLowerCase(), ql = q.toLowerCase();
+        const found = [];
+        let idx = 0;
+        while (found.length < 200) {
+          idx = lower.indexOf(ql, idx);
+          if (idx === -1) break;
+          found.push(idx); idx += ql.length;
+        }
+        res.innerHTML = `<div class="rs-count">Найдено: ${found.length}${found.length >= 200 ? '+' : ''}</div>`;
+        if (!found.length) { res.innerHTML += `<div class="rs-empty">${I('warn')}<br>Не нашлось «${esc(q)}»</div>`; return; }
+        found.forEach((off, i) => {
+          const start = Math.max(0, off - 38);
+          const before = engine.text.slice(start, off);
+          const hit = engine.text.slice(off, off + q.length);
+          const after = engine.text.slice(off + q.length, off + q.length + 60);
+          const pg = engine.pageIndexOfOffset(off);
+          const b = document.createElement('button');
+          b.className = 'sr-card'; b.style.animationDelay = Math.min(i * .025, .4) + 's';
+          b.innerHTML = `<span class="snip">${start > 0 ? '…' : ''}${esc(before)}<mark>${esc(hit)}</mark>${esc(after)}…</span><span class="pg">${pg + 1}</span>`;
+          b.onclick = () => {
+            close();
+            engine.setQuery(q);
+            engine.goOffset(off, pg, true);
+          };
+          res.appendChild(b);
+        });
+      }, 220);
+      inp.oninput = run;
+      setTimeout(() => inp.focus(), 80);
+    }
+
+    /* кнопки */
+    qs('#r-back', el).onclick = () => NR.Router.go('#/novel/' + n.id);
+    qs('#r-fav', el).onclick = function () {
+      const fav = NR.Store.shelf(n.id) === 'favorite';
+      NR.Store.setShelf(n.id, fav ? null : 'favorite');
+      this.innerHTML = I(fav ? 'heart' : 'heartFill');
+      NR.UI.toast(fav ? 'Убрано из избранного' : 'В избранном ❤', { icon: fav ? 'heart' : 'heartFill' });
+    };
+    qs('#ri-toc', el).onclick = () => openSheet('toc');
+    qs('#ri-bm', el).onclick = () => openSheet('bm');
+    qs('#ri-quotes', el).onclick = () => openSheet('quotes');
+    qs('#ri-search', el).onclick = openSearch;
+    qs('#ri-set', el).onclick = () => openSheet('set');
+
+    const onKey = e => {
+      if (rr.searchOpen) { if (e.key === 'Escape') rr.closeSearch(); return; }
+      if (e.key === 'Escape') { rr.sheetType ? closeSheet() : toggleChrome(); return; }
+      if (rr.sheetType) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') engine.next();
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') engine.prev();
+    };
+    document.addEventListener('keydown', onKey);
+    rr.disposers.push(() => document.removeEventListener('keydown', onKey));
+    NR.Router.pushBack(() => {
+      if (rr.searchOpen) rr.closeSearch();
+      else if (rr.sheetType) closeSheet();
+      else NR.Router.go('#/novel/' + n.id);
+    });
+
+    let lastW = window.innerWidth, lastH = window.innerHeight;
+    const onResize = debounce(() => {
+      if (rr.destroyed || rr.searchOpen || !engine.paras.length) return;
+      if (window.innerWidth === lastW && window.innerHeight === lastH) return;
+      lastW = window.innerWidth; lastH = window.innerHeight;
+      const off = engine.offset;
+      engine.invalidate();
+      engine.layout(off);
+    }, 250);
+    window.addEventListener('resize', onResize);
+    rr.disposers.push(() => window.removeEventListener('resize', onResize));
+    const onVis = () => { if (document.visibilityState === 'hidden') saveProg(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', saveProg);
+    rr.disposers.push(() => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', saveProg); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => {
+      if (!rr.destroyed && engine.paras.length) { const off = engine.offset; engine.invalidate(); engine.layout(off); }
+    });
+    rr.saveProg = saveProg;
+  }
+
+  function dispose() {
+    if (!R) return;
+    R.destroyed = true;
+    R.saveProg && R.saveProg();
+    NR.Store.flush();
+    R.disposers.forEach(f => { try { f(); } catch (e) {} });
+    R.engine.destroy();
+    R = null;
+  }
+  return { render, dispose };
+})();
