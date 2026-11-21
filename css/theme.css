@@ -1,0 +1,39 @@
+/* ═══ ПАЛИТРА: роза + золото + сливовые чернила ═══ */
+:root{
+  --bg:#fff4f7; --bg2:#ffe9f0; --surface:#fffdfd; --surface2:#fde7ef;
+  --header:#f6bfd4; --header2:#fbd7e4;
+  --ink:#33202c; --ink2:#6d4a5c; --muted:#a3798c;
+  --rose:#ee7fae; --rose-deep:#d94f8e; --magenta:#c2337c;
+  --gold:#d9a72e; --gold2:#f2d06b; --gold-deep:#a87b12;
+  --red:#e04545; --green:#3f9d6b; --amber:#e8a13c; --blue:#5b8dd9;
+  --line:#33202c; --scrim:rgba(51,22,40,.45);
+  --shadow:0 6px 18px rgba(217,79,142,.16);
+  --shadow-lg:0 14px 40px rgba(51,22,40,.22);
+  --r:16px; --pill:999px;
+  --font-ui:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --font-display:Georgia,'Times New Roman',serif;
+  --paper:radial-gradient(rgba(217,79,142,.05) 1px, transparent 1.4px);
+}
+:root[data-theme="night"]{
+  --bg:#221420; --bg2:#2a1927; --surface:#311f2d; --surface2:#3b2637;
+  --header:#4a2a40; --header2:#3b2637;
+  --ink:#f7e6ee; --ink2:#dcbccb; --muted:#a98ba0;
+  --rose:#ee7fae; --rose-deep:#f0619f; --magenta:#e0559c;
+  --gold:#e3b84a; --gold2:#f2d06b; --gold-deep:#c99b2a;
+  --line:#160d15; --scrim:rgba(10,4,9,.6);
+  --shadow:0 6px 18px rgba(0,0,0,.35);
+  --shadow-lg:0 14px 40px rgba(0,0,0,.5);
+  --paper:radial-gradient(rgba(242,208,107,.05) 1px, transparent 1.4px);
+}
+/* свой шрифт для читалки: положи файл assets/fonts/reader.ttf */
+@font-face{
+  font-family:'HanamiCustom';
+  src:url('../assets/fonts/reader.ttf') format('truetype');
+  font-display:swap;
+}
+/* темы читалки */
+.reader-viewport{--rt-bg:#fbf7ef;--rt-text:#3a2f2a;--rt-accent:#d9a72e;}
+.reader-viewport[data-rt="pink"]{--rt-bg:#fbe4ec;--rt-text:#4a2438;--rt-accent:#d94f8e;}
+.reader-viewport[data-rt="sepia"]{--rt-bg:#f3e7d3;--rt-text:#5b4632;--rt-accent:#b98a2f;}
+.reader-viewport[data-rt="dark"]{--rt-bg:#2e2430;--rt-text:#e8dce4;--rt-accent:#f2d06b;}
+.reader-viewport[data-rt="night"]{--rt-bg:#17121b;--rt-text:#b9a8c4;--rt-accent:#d9a72e;}
