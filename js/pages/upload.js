@@ -15,7 +15,7 @@ NR.Pages.upload = (() => {
 
   async function newNovelForm(file, text) {
     let coverData = null;
-    const guessTitle = file.name.replace(/\.(txt|fb2)$/i, '').replace(/[_]+/g, ' ').trim();
+    const guessTitle = file.name.replace(/\.(txt|fb2|epub|zip|html?|xhtml)$/i, '').replace(/[_]+/g, ' ').trim();
     const ge = NR.UI.genreEditor([]);
     const body = document.createElement('div');
     body.innerHTML = `
@@ -76,12 +76,12 @@ NR.Pages.upload = (() => {
           <button class="dropzone" id="up-drop">
             ${I('upload')}
             <b>Загрузить новеллу</b>
-            <span>Выбери файл .txt или .fb2 —<br>он сохранится в приложении, никуда не отправляется</span>
+            <span>Выбери файл .txt, .fb2, .epub или .zip —<br>он сохранится в приложении, никуда не отправляется</span>
           </button>
         </div>
         <div class="pg-card" style="--i:1">
           <h3>${I('books')} Из папки novels/</h3>
-          <p class="hint-p">Можно класть файлы прямо в репозиторий: текст в <b>novels/</b>, а строчку о novелле — в <b>data/novels.json</b>. Тогда они будут в каталоге сразу у всех.</p>
+          <p class="hint-p">Можно класть файлы прямо в репозиторий: текст в <b>novels/</b>, а строчку о новелле — в <b>data/novels.json</b>. Тогда они будут в каталоге сразу у всех.</p>
           <div class="mono" id="up-example"></div>
           <div style="margin-top:9px"><button class="btn small" id="up-copy">${I('copy', 's16')} Скопировать пример</button></div>
           <div id="up-notext" style="margin-top:14px"></div>
@@ -117,7 +117,7 @@ NR.Pages.upload = (() => {
         const text = await NR.U.readFileSmart(f);
         if (!text.trim()) { NR.UI.toast('Файл пустой 😿', { icon: 'warn' }); return; }
         newNovelForm(f, text);
-      } catch (e) { NR.UI.toast('Не смогла прочитать файл', { icon: 'warn' }); }
+      } catch (e) { NR.UI.toast(e.message || 'Не смогла прочитать файл 😿', { icon: 'warn', dur: 4500 }); }
     };
 
     function drawLists() {
@@ -132,9 +132,11 @@ NR.Pages.upload = (() => {
         d.querySelector('button').onclick = async () => {
           const f = await NR.U.pickFile('.txt,.fb2,text/plain');
           if (!f) return;
-          const text = await NR.U.readFileSmart(f);
-          await NR.Data.attachText(n.id, text);
-          NR.UI.toast('Текст привязан ✦', { icon: 'save' });
+          try {
+            const text = await NR.U.readFileSmart(f);
+            await NR.Data.attachText(n.id, text);
+            NR.UI.toast('Текст привязан ✦', { icon: 'save' });
+          } catch (e) { NR.UI.toast(e.message || 'Не смогла прочитать файл 😿', { icon: 'warn', dur: 4500 }); }
         };
         nt.appendChild(d);
       });
