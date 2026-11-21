@@ -44,7 +44,7 @@ NR.Pages.upload = (() => {
       try { coverData = await NR.U.readImageDataURL(f); body.querySelector('#u-prev').innerHTML = `<img src="${coverData}">`; }
       catch (e) { NR.UI.toast(e.message, { icon: 'warn' }); }
     };
-    const md = NR.UI.modal({
+    NR.UI.modal({
       title: 'Новая новелла', icon: 'upload', dark: true, body,
       actions: [
         { icon: 'close', label: 'Отмена', onClick: c => c() },
@@ -65,7 +65,6 @@ NR.Pages.upload = (() => {
         } },
       ]
     });
-    void md;
   }
 
   function render(el) {
@@ -79,35 +78,16 @@ NR.Pages.upload = (() => {
             <span>Выбери файл .txt, .fb2, .epub или .zip —<br>он сохранится в приложении, никуда не отправляется</span>
           </button>
         </div>
-        <div class="pg-card" style="--i:1">
-          <h3>${I('books')} Из папки novels/</h3>
-          <p class="hint-p">Можно класть файлы прямо в репозиторий: текст в <b>novels/</b>, а строчку о новелле — в <b>data/novels.json</b>. Тогда они будут в каталоге сразу у всех.</p>
-          <div class="mono" id="up-example"></div>
-          <div style="margin-top:9px"><button class="btn small" id="up-copy">${I('copy', 's16')} Скопировать пример</button></div>
-          <div id="up-notext" style="margin-top:14px"></div>
+        <div class="pg-card" style="--i:1" id="up-link-card" hidden>
+          <h3>${I('book')} Привязать текст</h3>
+          <p class="hint-p" style="margin-bottom:10px">Этим записям не хватает файла текста — можно привязать с телефона:</p>
+          <div class="up-list" id="up-notext"></div>
         </div>
         <div class="pg-card" style="--i:2">
           <h3>${I('layers')} Загруженные с телефона</h3>
           <div class="up-list" id="up-list"></div>
         </div>
       </div>`;
-    const example = `{
-  "id": "moya-novella",
-  "title": "Моя новелла",
-  "author": "Автор",
-  "type": "Новелла",
-  "year": "2024",
-  "country": "Япония",
-  "chapters": 100,
-  "genres": ["Фэнтези"],
-  "cover": "assets/covers/moya.jpg",
-  "file": "novels/moya-novella.txt",
-  "translation": "Продолжается",
-  "release": "Онгоинг",
-  "description": "О чём история…"
-}`;
-    qs('#up-example', el).textContent = example;
-    qs('#up-copy', el).onclick = async () => { await NR.U.copyText(example); NR.UI.toast('Пример скопирован ✓', { icon: 'copy' }); };
 
     qs('#up-drop', el).onclick = async () => {
       const f = await NR.U.pickFile('.txt,.fb2,text/plain');
@@ -121,9 +101,10 @@ NR.Pages.upload = (() => {
     };
 
     function drawLists() {
-      const nt = qs('#up-notext', el);
       const noText = NR.Data.jsonNoText();
-      nt.innerHTML = noText.length ? '<p class="hint-p" style="margin-bottom:8px">Этим записям не хватает файла текста — можно привязать с телефона:</p>' : '';
+      qs('#up-link-card', el).hidden = !noText.length;
+      const nt = qs('#up-notext', el);
+      nt.innerHTML = '';
       noText.forEach(n => {
         const d = document.createElement('div');
         d.className = 'up-item';
