@@ -9,7 +9,6 @@ NR.ReaderEngine = class {
     this.onPage = null; this.mode = 'book';
     this._flip = null;
   }
-  /* разбор текста на абзацы и главы */
   setText(raw) {
     const t = raw.replace(/\r\n?/g, '\n').replace(/\u00A0/g, ' ').trim();
     const lines = t.split('\n');
@@ -35,6 +34,18 @@ NR.ReaderEngine = class {
     this.text = blocks.join('\n\n');
     this.strip.innerHTML = '';
     this.strip.appendChild(frag);
+    /* если книга пришла из epub/fb2 — главы берём точные, из файла */
+    const marks = NR.Data && NR.Data.chaptersForText ? NR.Data.chaptersForText(raw) : null;
+    if (marks && marks.length) {
+      this.chapters = [];
+      marks.forEach(m => {
+        const p = this.paras[m.para];
+        if (!p) return;
+        p.el.classList.add('r-ch'); p.ch = true;
+        this.chapters.push({ title: m.title || p.el.textContent, off: p.off });
+      });
+      if (!this.chapters.length && this.paras.length) this.chapters.push({ title: 'Начало', off: 0 });
+    }
   }
   applySettings(s) {
     this.settings = s; this.mode = s.mode;
@@ -94,7 +105,6 @@ NR.ReaderEngine = class {
     this.goPage(this.pageOfOffset(off), false);
     return p;
   }
-  /* где начинается абзац с этим смещением */
   locate(off) {
     off = NR.U.clamp(off, 0, Math.max(0, this.text.length - 1));
     let lo = 0, hi = this.paras.length - 1;
@@ -161,7 +171,6 @@ NR.ReaderEngine = class {
     return NR.Store.s.anim && this.paras.length <= 2500 &&
       !matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
-  /* перелистывание «как в книге» */
   flip(pg, dir) {
     if (this._flip) { this._flip.finish(); }
     const old = this.current;
