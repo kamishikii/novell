@@ -28,6 +28,16 @@ NR.Pages.novel = (() => {
     if (!existing) setTimeout(() => ta.focus(), 80);
   }
 
+  async function pickBook() {
+    const f = await NR.U.pickFile('*/*');
+    if (!f) return null;
+    try {
+      const text = await NR.U.readFileSmart(f);
+      if (!text.trim()) { NR.UI.toast('Файл пустой 😿', { icon: 'warn' }); return null; }
+      return text;
+    } catch (e) { NR.UI.toast(e.message || 'Не тот формат 😿', { icon: 'warn', dur: 4500 }); return null; }
+  }
+
   function view(el, n) {
     document.body.classList.remove('editing');
     const prog = n.progress;
@@ -75,7 +85,7 @@ NR.Pages.novel = (() => {
         <div class="warn-card">${I('warn')}
           <div><b>Файл текста не найден</b>
             Положи файл сюда: <div class="mono">${esc(n.file || 'novels/' + n.id + '.txt')}</div>
-            или выбери файл прямо с телефона:
+            или выбери файл прямо с телефона (${esc(NR.Books.supported)}):
             <div style="margin-top:8px"><button class="btn small gold" id="nv-attach">${I('upload', 's16')} Выбрать файл</button></div>
           </div>
         </div>` : ''}
@@ -95,9 +105,8 @@ NR.Pages.novel = (() => {
     NR.U.qsa('#nv-chips .chip', el).forEach(c => c.onclick = () => NR.Router.go('#/'));
     const att = qs('#nv-attach', el);
     if (att) att.onclick = async () => {
-      const f = await NR.U.pickFile('.txt,.fb2,text/plain');
-      if (!f) return;
-      const text = await NR.U.readFileSmart(f);
+      const text = await pickBook();
+      if (!text) return;
       await NR.Data.attachText(n.id, text);
       NR.UI.toast('Текст привязан ✦ можно читать!', { icon: 'save' });
       view(el, NR.Data.get(n.id));
@@ -106,7 +115,7 @@ NR.Pages.novel = (() => {
 
   function edit(el, n) {
     document.body.classList.add('editing');
-    let coverData = null;
+    let coverData = null, coverCleared = false;
     const ge = NR.UI.genreEditor(n.genres || []);
     el.innerHTML = `
       <header class="app-header">
@@ -138,12 +147,20 @@ NR.Pages.novel = (() => {
         <div class="field"><label>Жанры</label><div id="f-genres"></div></div>
         <div class="field"><label>Обложка</label>
           <div class="up-cover">
-            <span class="mini" id="f-cov-prev">${n.cover ? `<img src="${esc(n.cover)}">` : ''}</span>
-            <div style="flex:1;display:flex;flex-direction:column;gap:7px">
-              <input class="inp" id="f-cover" placeholder="assets/covers/моя.jpg" value="${n.cover && !n.cover.startsWith('data:') ? esc(n.cover) : ''}">
-              <button class="btn small" id="f-cov-btn">${I('upload', 's16')} Картинка с телефона</button>
+            <div class="cov-prev" id="f-cov-prev"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:7px;min-width:0">
+              <input class="inp" id="f-cover" placeholder="путь: assets/covers/моя.jpg" value="${n.cover && !n.cover.startsWith('data:') ? esc(n.cover) : ''}">
+              <div style="display:flex;gap:7px;flex-wrap:wrap">
+                <button class="btn small" id="f-cov-btn">${I('upload', 's16')} С телефона</button>
+                <button class="btn small ghost" id="f-cov-clear">${I('trash', 's16')} Убрать</button>
+              </div>
+              <span class="hint-p" id="f-cov-state"></span>
             </div>
           </div>
+        </div>
+        <div class="field"><label>Текст книги</label>
+          <button class="btn small gold" id="f-text-btn">${I('book', 's16')} Выбрать файл (${esc(NR.Books.supported)})</button>
+          <span class="hint-p" id="f-text-state">${n.hasText ? 'Текст уже есть — новый файл заменит его' : 'Текста пока нет — выбери файл'}</span>
         </div>
         <div class="field"><label>Описание</label><textarea class="inp" id="f-desc" rows="6">${esc(n.description)}</textarea></div>
         ${n.uploaded ? `<div class="edit-zone">
@@ -151,6 +168,22 @@ NR.Pages.novel = (() => {
         </div>` : ''}
       </div>`;
     qs('#f-genres', el).appendChild(ge.el);
+
+    /* превью обложки */
+    const prev = qs('#f-cov-prev', el), covState = qs('#f-cov-state', el);
+    const letter = ((n.title || '?').trim()[0] || '?');
+    const drawPrev = src => {
+      prev.innerHTML = '';
+      if (src) {
+        const img = document.createElement('img');
+        img.src = src;
+        img.onerror = () => { prev.innerHTML = `<span class="ph-l">${esc(letter)}</span>`; };
+        prev.appendChild(img);
+      } else prev.innerHTML = `<span class="ph-l">${esc(letter)}</span>`;
+      covState.textContent = src ? (src.startsWith('data:') ? 'Сейчас: картинка с телефона ✓' : 'Сейчас: ' + src) : 'Сейчас: серая заглушка';
+    };
+    drawPrev(n.cover);
+
     const exit = () => { editing = false; view(el, NR.Data.get(nid)); };
     qs('#ed-cancel', el).onclick = exit;
     NR.Router.pushBack(exit);
@@ -159,9 +192,22 @@ NR.Pages.novel = (() => {
       if (!f) return;
       try {
         coverData = await NR.U.readImageDataURL(f);
-        qs('#f-cov-prev', el).innerHTML = `<img src="${coverData}">`;
+        coverCleared = false;
         qs('#f-cover', el).value = '';
+        drawPrev(coverData);
       } catch (e) { NR.UI.toast(e.message, { icon: 'warn' }); }
+    };
+    qs('#f-cov-clear', el).onclick = () => {
+      coverData = null; coverCleared = true;
+      qs('#f-cover', el).value = '';
+      drawPrev(null);
+    };
+    qs('#f-text-btn', el).onclick = async () => {
+      const text = await pickBook();
+      if (!text) return;
+      await NR.Data.attachText(n.id, text);
+      qs('#f-text-state', el).textContent = 'Новый текст загружен ✓';
+      NR.UI.toast('Текст книги обновлён ✦', { icon: 'save' });
     };
     qs('#ed-save', el).onclick = async () => {
       const patch = {
@@ -178,7 +224,8 @@ NR.Pages.novel = (() => {
       };
       const covPath = qs('#f-cover', el).value.trim();
       if (coverData) await NR.Data.setCover(n.id, coverData);
-      else if (covPath) patch.cover = covPath;
+      else if (coverCleared) { await NR.Data.removeCover(n.id); patch.cover = ''; }
+      else if (covPath) { await NR.Data.removeCover(n.id); patch.cover = covPath; }
       NR.Store.setOverride(n.id, patch);
       NR.UI.toast('Сохранено ✓', { icon: 'save' });
       exit();
