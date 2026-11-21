@@ -1,0 +1,15 @@
+{
+  "appId": "com.kamishikii.hanami",
+  "appName": "Ханами",
+  "webDir": "www",
+  "backgroundColor": "#f6bfd4",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": true,
+      "backgroundColor": "#f6bfd4"
+    }
+  }
+}
